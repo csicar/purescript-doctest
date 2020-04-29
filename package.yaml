@@ -42,6 +42,8 @@ dependencies:
 - gitrev -any
 - pretty-simple
 - stringsearch
+- ansi-wl-pprint
+- cheapskate
 - utf8-string
 - Glob
 - optparse-applicative
