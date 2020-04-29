@@ -1,11 +1,36 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
+
 
 module Main where
 
 import Control.Monad (when)
 import qualified Control.Monad.Parallel as Par
+import           System.Exit (exitSuccess, exitFailure)
+
+import           Control.Applicative
+import           Control.Monad
+import qualified Data.Aeson as A
+import           Data.Bool (bool)
+import           Data.List (intercalate)
+import qualified Data.Map as M
+import qualified Data.Set as S
+import qualified Data.Text as T
+import           Data.Traversable (for)
+import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
+import           Language.PureScript.Errors.JSON
+import           Language.PureScript.Make
+import qualified Options.Applicative as Opts
+import           System.Exit (exitSuccess, exitFailure)
+import           System.Directory (getCurrentDirectory)
+import           System.IO (hPutStr, hPutStrLn, stderr, stdout)
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Char
@@ -13,6 +38,13 @@ import Data.FileEmbed (embedFile)
 import Data.List (delete, intercalate, isPrefixOf, nub, partition, (\\))
 import Data.Maybe
 import Data.Monoid ((<>))
+import qualified Language.PureScript as P
+import qualified Data.Map as M
+import qualified Options.Applicative as Opts
+
+import qualified Language.PureScript.CST as CST
+
+
 import Data.Version
 import Control.Monad.Supply
 import Control.Monad.Supply.Class
@@ -21,7 +53,6 @@ import Text.Printf
 import System.Environment
 import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getCurrentDirectory, getModificationTime)
 import System.FilePath ((</>), joinPath, splitDirectories, takeDirectory)
-import System.FilePath.Find
 import System.Process
 
 import Data.Text (Text)
@@ -29,201 +60,159 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as L
 import qualified Data.Text.Lazy.Encoding as L
+import qualified System.IO as IO
+
 import qualified Data.ByteString as B
 
+
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
+import qualified Data.ByteString.Search as BSS
+import qualified Data.ByteString.UTF8 as UTF8
+import           Data.Text (Text)
+import qualified Data.Text.Encoding as TE
+import           System.FilePath.Glob (glob)
+
+import           Protolude (ordNub)
+import Util.IO.UTF8
+
 import Development.GitRev
+import Debug.Pretty.Simple
 
-import Language.PureScript.AST.Literals
-import Language.PureScript.CoreFn
-import Language.PureScript.CoreFn.FromJSON
 
-import CodeGen.IL
-import CodeGen.IL.Common
-import CodeGen.IL.Printer
+data PSCMakeOptions = PSCMakeOptions
+  { pscmInput        :: [FilePath]
+  , pscmOutputDir    :: FilePath
+  , pscmOpts         :: P.Options
+  , pscmUsePrefix    :: Bool
+  , pscmJSONErrors   :: Bool
+  }
 
-import Tests
 
-data Command = Build | Run
+compile :: PSCMakeOptions -> IO ()
+compile PSCMakeOptions{..} = do
+  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  when (null input) $ do
+    hPutStr stderr $ unlines [ "purs compile: No input files."
+                             , "Usage: For basic information, try the `--help' option."
+                             ]
+    exitFailure
+  moduleFiles <- readUTF8FilesT input
+  (makeErrors, makeWarnings) <- runMake pscmOpts $ do
+    ms <- CST.parseModulesFromFiles id moduleFiles
+    
+    let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
+    foreigns <- inferForeignModules filePathMap
+    let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
+    P.make makeActions (map snd (pTrace "ms" ms))
+  
+  -- printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
+  exitSuccess
 
-parseJson :: Text -> Value
-parseJson text
-  | Just fileJson <- decode . L.encodeUtf8 $ L.fromStrict text = fileJson
-  | otherwise = error "Bad json"
-
-jsonToModule :: Value -> Module Ann
-jsonToModule value =
-  case parse moduleFromJSON value of
-    Success (_, r) -> r
-    _ -> error "failed"
 
 main :: IO ()
 main = do
-  args <- getArgs
-  let (opts, files) = partition (isPrefixOf "--") args
-      opts' = (map . map) toLower opts
-  if "--tests" `elem` opts'
-    then runTests
-    else do
-      if "--help" `elem` opts' || "--version" `elem` opts'
-        then do
-          when ("--help" `elem` opts') $ do
-            putStrLn help
-          when ("--version" `elem` opts') $ do
-            let branch = $(gitBranch)
-                details | branch == "golang" = "master, commit " ++ $(gitHash)
-                        | otherwise = branch
-            putStrLn $ details ++ if $(gitDirty) then " (DIRTY)" else ""
-        else do
-          if null files
-            then do
-              currentDir <- getCurrentDirectory
-              processFiles opts' [currentDir]
-            else
-              processFiles opts' files
-          if "--run" `elem` opts
-            then runBuildTool Run
-            else when ("--no-build" `notElem` opts) $
-                 runBuildTool Build
-  return ()
+    IO.hSetEncoding IO.stdout IO.utf8
+    IO.hSetEncoding IO.stderr IO.utf8
+    IO.hSetBuffering IO.stdout IO.LineBuffering
+    IO.hSetBuffering IO.stderr IO.LineBuffering
+    cmd <- Opts.execParser opts
+    cmd
+      where
+    opts = Opts.info (command)
+      ( Opts.progDesc "Print a greeting for TARGET"
+     <> Opts.header "hello - a test for optparse-applicative" )
+
+
+
+warnFileTypeNotFound :: String -> IO ()
+warnFileTypeNotFound = hPutStrLn stderr . ("purs compile: No files found using pattern: " ++)
+
+globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
+globWarningOnMisses warn = concatMapM globWithWarning
   where
-  processFiles :: [String] -> [FilePath] -> IO ()
-  processFiles opts [file] = do
-    isDir <- doesDirectoryExist file
-    if isDir then do
-      files <- find always (fileName ==? corefn) file
-      if null files
-        then errorNoCorefnFiles
-        else generateFiles opts files
-    else generateFiles opts [file]
-  processFiles opts files = do
-    generateFiles opts files
-  basePath :: [FilePath] -> FilePath
-  basePath files =
-    let filepath = takeDirectory (head files) in
-    joinPath $ (init $ splitDirectories filepath)
-  generateFiles :: [String] -> [FilePath] -> IO ()
-  generateFiles opts files = do
-    let baseOutpath = basePath files
-    writeSupportFiles baseOutpath
-    Par.mapM (generateCode opts baseOutpath) files
-    return ()
-  runBuildTool :: Command -> IO ()
-  runBuildTool cmd = do
-    let command = case cmd of
-                    Build -> "build"
-                    Run -> "run"
-    project <- projectEnv
-    callProcess "go" [command, T.unpack project </> modPrefix' </> "Main"]
-    return ()
+  globWithWarning pattern' = do
+    paths <- glob pattern'
+    when (null paths) $ warn pattern'
+    return paths
+  concatMapM f = fmap concat . mapM f
 
-generateCode :: [String] -> FilePath -> FilePath -> IO ()
-generateCode opts baseOutpath jsonFile = do
-  jsonModTime <- getModificationTime jsonFile
-  let filepath = takeDirectory jsonFile
-      dirparts = splitDirectories $ filepath
-      mname = last dirparts
-      basedir = joinPath $ init dirparts
-      mname' = T.pack mname
-      possibleFileName = basedir </> (T.unpack mname') </> implFileName mname'
-  exists <- doesFileExist possibleFileName
-  if exists
-    then do
-      modTime <- getModificationTime possibleFileName
-      when (modTime < jsonModTime) $
-        transpile opts baseOutpath jsonFile
-    else transpile opts baseOutpath jsonFile
+inputFile :: Opts.Parser FilePath
+inputFile = Opts.strArgument $
+     Opts.metavar "FILE"
+  <> Opts.help "The input .purs file(s)."
 
-transpile :: [String] -> FilePath -> FilePath -> IO ()
-transpile opts baseOutpath jsonFile = do
-  jsonText <- T.decodeUtf8 <$> B.readFile jsonFile
-  project <- projectEnv
-  let module' = jsonToModule $ parseJson jsonText
-  ((_, foreigns, asts, implHeader, implFooter), _) <- runSupplyT 5 (moduleToIL module' project)
-  let mn = moduleNameToIL' $ moduleName module'
-      implementation = prettyPrintIL asts
-      outpath = joinPath [baseOutpath, T.unpack mn]
-      implPath = outpath </> implFileName mn
-  createDirectoryIfMissing True outpath
-  putStrLn implPath
-  B.writeFile implPath $ T.encodeUtf8 (implHeader <> implementation <> implFooter)
+outputDirectory :: Opts.Parser FilePath
+outputDirectory = Opts.strOption $
+     Opts.short 'o'
+  <> Opts.long "output"
+  <> Opts.value "output"
+  <> Opts.showDefault
+  <> Opts.help "The output directory"
 
-writeSupportFiles :: FilePath -> IO ()
-writeSupportFiles baseOutpath = do
-  currentDir <- getCurrentDirectory
-  let outputdir = T.pack $ baseOutpath \\ currentDir
-      ffiOutpath = currentDir </> subdir
-  createDirectoryIfMissing True baseOutpath
-  createDirectoryIfMissing True ffiOutpath
-  writeModuleFile outputdir currentDir  $(embedFile "support/go.mod.working")
-  writeModuleFile outputdir baseOutpath $(embedFile "support/go.mod.output")
-  writeModuleFile outputdir ffiOutpath  $(embedFile "support/go.mod.ffi-loader")
-  writeLoaderFile ffiOutpath $(embedFile "support/ffi-loader.go")
+comments :: Opts.Parser Bool
+comments = Opts.switch $
+     Opts.short 'c'
+  <> Opts.long "comments"
+  <> Opts.help "Include comments in the generated code"
+
+verboseErrors :: Opts.Parser Bool
+verboseErrors = Opts.switch $
+     Opts.short 'v'
+  <> Opts.long "verbose-errors"
+  <> Opts.help "Display verbose error messages"
+
+noPrefix :: Opts.Parser Bool
+noPrefix = Opts.switch $
+     Opts.short 'p'
+  <> Opts.long "no-prefix"
+  <> Opts.help "Do not include comment header"
+
+jsonErrors :: Opts.Parser Bool
+jsonErrors = Opts.switch $
+     Opts.long "json-errors"
+  <> Opts.help "Print errors to stderr as JSON"
+
+codegenTargets :: Opts.Parser [P.CodegenTarget]
+codegenTargets = Opts.option targetParser $
+     Opts.short 'g'
+  <> Opts.long "codegen"
+  <> Opts.value [P.JS]
+  <> Opts.help
+      ( "Specifies comma-separated codegen targets to include. "
+      <> targetsMessage
+      <> " The default target is 'js', but if this option is used only the targets specified will be used."
+      )
+
+targetsMessage :: String
+targetsMessage = "Accepted codegen targets are '" <> intercalate "', '" (M.keys P.codegenTargets) <> "'."
+
+targetParser :: Opts.ReadM [P.CodegenTarget]
+targetParser =
+  Opts.str >>= \s ->
+    for (T.split (== ',') s)
+      $ maybe (Opts.readerError targetsMessage) pure
+      . flip M.lookup P.codegenTargets
+      . T.unpack
+      . T.strip
+
+options :: Opts.Parser P.Options
+options =
+  P.Options
+    <$> verboseErrors
+    <*> (not <$> comments)
+    <*> (handleTargets <$> codegenTargets)
   where
-  writeModuleFile :: Text -> FilePath -> B.ByteString -> IO ()
-  writeModuleFile outputdir path modText = do
-    let goModSource = path </> "go.mod"
-    goModSourceExists <- doesFileExist goModSource
-    when (not goModSourceExists) $ do
-      project <- projectEnv
-      let project' = T.unpack project
-          outputdir' = tail $ T.unpack outputdir
-          modText' = T.replace "$PROJECT" project $ T.decodeUtf8 modText
-          replaceLoader = project' </> ffiLoader' <> "=." </> subdir
-          replaceOutput = project' </> modPrefix' <> "=." </> outputdir'
-      B.writeFile goModSource $ T.encodeUtf8 modText'
-      callProcess "go" ["mod", "edit", "-replace", replaceLoader]
-      callProcess "go" ["mod", "edit", "-replace", replaceOutput]
-      callProcess "go" ["clean", "-modcache"]
-  writeLoaderFile :: FilePath -> B.ByteString -> IO ()
-  writeLoaderFile ffiOutpath loaderText = do
-    let loaderSource = ffiOutpath </> "ffi_loader.go"
-    loaderSourceExists <- doesFileExist loaderSource
-    when (not loaderSourceExists) $ do
-      B.writeFile loaderSource loaderText
+    -- Ensure that the JS target is included if sourcemaps are
+    handleTargets :: [P.CodegenTarget] -> S.Set P.CodegenTarget
+    handleTargets ts = S.fromList (if elem P.JSSourceMap ts then P.JS : ts else ts)
 
-implFileName :: Text -> FilePath
-implFileName mn = ((\c -> if c == '.' then '_' else c) <$> T.unpack mn) <> ".go"
+pscMakeOptions :: Opts.Parser PSCMakeOptions
+pscMakeOptions = PSCMakeOptions <$> many inputFile
+                                <*> outputDirectory
+                                <*> options
+                                <*> (not <$> noPrefix)
+                                <*> jsonErrors
 
-projectEnv :: IO Text
-projectEnv = do
-  T.pack . fromMaybe defaultProject <$> lookupEnv goproject
-
-help :: String
-help = "Usage: psgo OPTIONS COREFN-FILES\n\
-       \  PureScript to native (via go) compiler\n\n\
-       \Available options:\n\
-       \  --help                  Show this help text\n\n\
-       \  --version               Show the version number\n\n\
-       \  --run                   Run the generated go code directly, without building an\n\
-       \                          executable\n\
-       \  --no-build              Generate go source files, but do not build an executable\n\
-       \  --tests                 Run test cases (under construction)\n\n\
-       \See also:\n\
-       \  purs compile --help\n"
-
-corefn :: String
-corefn = "corefn.json"
-
-goSrc :: String
-goSrc = ".go"
-
-goproject :: String
-goproject = "GOPROJECT"
-
-defaultProject :: String
-defaultProject = "project.localhost"
-
-modPrefix' :: String
-modPrefix' = T.unpack modPrefix
-
-ffiLoader' :: String
-ffiLoader' = T.unpack ffiLoader
-
-subdir :: String
-subdir = T.unpack modLabel
-
-errorNoCorefnFiles :: IO ()
-errorNoCorefnFiles = do
-    ioError . userError $ "no compiled purescript '" <> corefn <> "' files found –\n" <>
-        "                  make sure to use the '--codegen corefn' option with your purs\n" <>
-        "                  project build tool"
+command :: Opts.Parser (IO ())
+command = compile <$> (Opts.helper <*> pscMakeOptions)
