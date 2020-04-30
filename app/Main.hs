@@ -26,32 +26,21 @@ import           System.IO.UTF8 (writeUTF8FileT)
 import Debug.Pretty.Simple
 import Purepur.Generate
 
--- | Available output formats
-data Format
-  = Markdown
-  | Html
-  | Ctags -- Output ctags symbol index suitable for use with vi
-  | Etags -- Output etags symbol index suitable for use with emacs
-  deriving (Show, Eq, Ord)
-
-
-
 data PSCDocsOptions = PSCDocsOptions
-  { _pscdFormat :: Format
-  , _pscdOutput :: Maybe FilePath
+  { _pscdOutput :: Maybe FilePath
   , _pscdCompileOutputDir :: FilePath
   , _pscdInputFiles  :: [FilePath]
   }
   deriving (Show)
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt moutput compileOutput inputGlob) = do
+docgen (PSCDocsOptions moutput compileOutput inputGlob) = do
   input <- concat <$> mapM glob inputGlob
   when (null input) $ do
     hPutStrLn stderr "purs docs: no input files."
     exitFailure
 
-  let output = fromMaybe (defaultOutputForFormat fmt) moutput
+  let output = fromMaybe "test/doc-examples" moutput
 
   fileMs <- parseAndConvert input
 
@@ -105,30 +94,14 @@ main = do
   cmd <- Opts.execParser opts
   cmd
     where
-  opts = Opts.info (command)
+  opts = Opts.info command
     ( Opts.progDesc "Print a greeting for TARGET"
     <> Opts.header "hello - a test for optparse-applicative" )
 
-instance Read Format where
-  readsPrec _ "etags" = [(Etags, "")]
-  readsPrec _ "ctags" = [(Ctags, "")]
-  readsPrec _ "markdown" = [(Markdown, "")]
-  readsPrec _ "html" = [(Html, "")]
-  readsPrec _ _ = []
-
-defaultOutputForFormat :: Format -> FilePath
-defaultOutputForFormat fmt = "generated-docs/html"
 
 pscDocsOptions :: Opts.Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> format <*> output <*> compileOutputDir <*> many inputFile
+pscDocsOptions = PSCDocsOptions <$> output <*> compileOutputDir <*> many inputFile
   where
-  format :: Opts.Parser Format
-  format = Opts.option Opts.auto $
-       Opts.value Html
-    <> Opts.long "format"
-    <> Opts.metavar "FORMAT"
-    <> Opts.help "Set output FORMAT (markdown | html | etags | ctags)"
-
   output :: Opts.Parser (Maybe FilePath)
   output = optional $ Opts.strOption $
        Opts.long "output"

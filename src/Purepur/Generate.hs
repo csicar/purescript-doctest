@@ -26,8 +26,14 @@ import qualified Purepur.Parser as Parser
 
 -- https://hackage.haskell.org/package/purescript-0.13.6/docs/Language-PureScript-Docs-Types.html#t:Declaration
 generateTest :: (FilePath, D.Module) -> (P.ModuleName, T.Text)
-generateTest (filePath, D.Module name maybeComments declarations _)= (name, T.unlines $ toTest maybeComments <> mconcat (map generateTestForDeclaration declarations))
+generateTest (filePath, D.Module name maybeComments declarations _)= (name, documentHeader <> document)
   where
+    document = 
+      T.unlines $ toTest maybeComments <> mconcat (map generateTestForDeclaration declarations)
+
+    documentHeader :: T.Text
+    documentHeader = "module Test.Example." <> P.runModuleName name <> " where \n\n"
+
     toTest Nothing = []
     toTest (Just comment) = Parser.extractCodeFromComment comment
 

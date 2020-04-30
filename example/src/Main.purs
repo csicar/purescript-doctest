@@ -6,7 +6,7 @@ import Effect (Effect)
 import Effect.Console (log)
 
 --| asd
---| ```purescript
+--| ```purescript run
 --| import Test
 --| > f a
 --| 10
@@ -16,13 +16,13 @@ main = do
   log "🍝"
   where tes = 2
 
---| ```purescript
+--| ```purescript run
 --| a test
 --| ```
 -- |
 a = 1
 
---| ```purescript
+--| ```pupMrescript run
 --| b test
 --| ```
 -- |
