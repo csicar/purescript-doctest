@@ -1,4 +1,4 @@
-module Main (main, a, b) where
+module Main where
 
 import Prelude
 
@@ -7,23 +7,25 @@ import Effect.Console (log)
 
 --| asd
 --| ```purescript run
---| import Test
+--| import Tests
+--|as
 --| > f a
 --| 10
+--|
+--|
 --| ```
 main :: Effect Unit
 main = do
   log "🍝"
   where tes = 2
 
+--| asd
 --| ```purescript run
---| a test
+--| > import Test
+--|as
+--| > f a
+--| 10
+--|
+--|
 --| ```
--- |
-a = 1
-
---| ```pupMrescript run
---| b test
---| ```
--- |
-b = 2
+a = 2

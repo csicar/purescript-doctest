@@ -7,7 +7,7 @@ import Prelude
 
 import           Control.Applicative
 import           Control.Monad.Writer
-import           Control.Monad.Trans.Except (runExceptT)
+import           Control.Monad.Trans.Except (runExcept, runExceptT, Except)
 import           Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
@@ -15,6 +15,8 @@ import qualified Language.PureScript.Docs as D
 import           Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import qualified Options.Applicative as Opts
 import qualified System.IO as IO
+import Text.Parsec (ParseError)
+import Control.Arrow ((>>>))
 
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
@@ -26,26 +28,35 @@ import           System.IO.UTF8 (writeUTF8FileT)
 import Debug.Pretty.Simple
 import Purepur.Generate
 
-data PSCDocsOptions = PSCDocsOptions
+data PurepurOptions = PurepurOptions
   { _pscdOutput :: Maybe FilePath
   , _pscdCompileOutputDir :: FilePath
-  , _pscdInputFiles  :: [FilePath]
+  , _purepurInputFiles :: [FilePath]
+  -- ^ Paths of files, that should be used generating for tests
+  , _pscdInputFiles :: [FilePath]
+  -- ^ Paths of files, that should be used in compilation
   }
   deriving (Show)
 
-docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions moutput compileOutput inputGlob) = do
+docgen :: PurepurOptions -> IO ()
+docgen p@(PurepurOptions moutput compileOutput inputGlob compileInputGlob) = do
+  compileInput <- concat <$> mapM glob compileInputGlob
   input <- concat <$> mapM glob inputGlob
+
+  when (null compileInput) $ do
+    hPutStrLn stderr "purepur: arguments provides no compile input files."
+    exitFailure
+  
   when (null input) $ do
-    hPutStrLn stderr "purs docs: no input files."
+    hPutStrLn stderr "purepur: --src provides no input files."
     exitFailure
 
   let output = fromMaybe "test/doc-examples" moutput
 
-  fileMs <- parseAndConvert input
+  fileMs <- parseAndConvert compileInput
 
   let ext = compile "*.purs"
-  let msCommentTest = map generateTest fileMs
+  msCommentTest <- runExceptIO $ mapM generateTest $ filter ((`elem` input) . fst) fileMs
   createDirectoryIfMissing True output
   globDir1 ext output >>= mapM_ removeFile
   writeTestModules output msCommentTest
@@ -53,6 +64,13 @@ docgen (PSCDocsOptions moutput compileOutput inputGlob) = do
   pure ()
 
   where
+  runExceptIO :: Except ParseError a -> IO a
+  runExceptIO = runExcept >>> \case 
+    Right x -> return x
+    Left err -> do
+      IO.hPrint stderr err
+      exitFailure
+
   successOrExit :: Either P.MultipleErrors a -> IO a
   successOrExit act =
     case act of
@@ -75,8 +93,7 @@ docgen (PSCDocsOptions moutput compileOutput inputGlob) = do
 
 
 writeTestModules :: FilePath -> [(P.ModuleName, T.Text)] -> IO ()
-writeTestModules outputDir modules = do
-  mapM_ (writeTestModule outputDir ) modules
+writeTestModules outputDir = mapM_ (writeTestModule outputDir )
 
 writeTestModule :: FilePath -> (P.ModuleName, T.Text) -> IO ()
 writeTestModule outputDir (mn, text) = do
@@ -99,8 +116,8 @@ main = do
     <> Opts.header "hello - a test for optparse-applicative" )
 
 
-pscDocsOptions :: Opts.Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> output <*> compileOutputDir <*> many inputFile
+pscDocsOptions :: Opts.Parser PurepurOptions
+pscDocsOptions = PurepurOptions <$> output <*> compileOutputDir <*> some purepurInputFile <*> many inputFile
   where
   output :: Opts.Parser (Maybe FilePath)
   output = optional $ Opts.strOption $
@@ -117,10 +134,16 @@ pscDocsOptions = PSCDocsOptions <$> output <*> compileOutputDir <*> many inputFi
     <> Opts.metavar "DIR"
     <> Opts.help "Compiler output directory"
 
+  purepurInputFile :: Opts.Parser FilePath
+  purepurInputFile = Opts.strOption $
+       Opts.long "src"
+    <> Opts.metavar "FILE"
+    <> Opts.help "The files, for which tests should be generated (should only include source files)"
+
   inputFile :: Opts.Parser FilePath
   inputFile = Opts.strArgument $
        Opts.metavar "FILE"
-    <> Opts.help "The input .purs file(s)"
+    <> Opts.help "The input .purs file(s) used for compilation (should include dependencies)"
 
 command :: Opts.Parser (IO ())
 command = docgen <$> (Opts.helper <*> pscDocsOptions)
