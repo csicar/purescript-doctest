@@ -7,6 +7,5 @@ import Prelude
 
 
 printDeclaration :: Declaration -> Text
-printDeclaration (Import s) = "import " <> s
-printDeclaration (Command s) = s
+printDeclaration (Command s) = pack $ show s
 printDeclaration (ExpectedOutput s) = s

@@ -44,7 +44,7 @@ extra-deps:
    commit: 738aaa2f21097c7f18aa8100b16ae52316addb04
 - network-3.0.1.1
 - pipes-http-1.0.5
-
+- ghc-lib-parser-8.10.1.20200412
 # Override default flag values for local packages and extra-deps
 # flags: {}
 

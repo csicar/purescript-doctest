@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneDeriving #-}
 module Purepur.Parser where
 
 import Prelude
@@ -12,8 +13,13 @@ import Text.ParserCombinators.Parsec
 import Data.Either (fromRight, partitionEithers)
 import Control.Arrow
 import Debug.Pretty.Simple
-import Text.ParserCombinators.Parsec.Token (whiteSpace)
 import Control.Monad.Trans.Except
+import qualified Language.PureScript.Interactive.Types as Psci
+import qualified Language.PureScript.Interactive.Parser as Psci
+import qualified Language.PureScript.AST.Declarations
+import qualified Language.PureScript.TypeClassDictionaries
+import qualified Language.PureScript.Names
+import Debug.Trace
 
 opts = Cheapskate.def { Cheapskate.allowRawHtml = False }
 
@@ -40,32 +46,50 @@ extractCodeFromComment comment =  foldM (\decl m -> m >>= (\acc -> return $ decl
     goCodeBlock _ _ = Nothing
 
 data Declaration
-  = Import Text
-  | Command Text
+  = Command [Psci.Command]
   | ExpectedOutput Text deriving (Show)
 
+instance Eq Declaration where
+  a == b = show a == show b -- TODO : Eq instance for Psci.Command missing. Fix this in Purescript lang
 
 parseInfoBlock :: Text -> Either ParseError [Declaration]
-parseInfoBlock = parse parseDeclaration "parse error" . unpack . (<> "\n")
-  where 
-    parseDeclaration :: GenParser Char st [Declaration]
-    parseDeclaration = do
-        result <- many parseStatement
-        many eol
-        eof
-        return result
+parseInfoBlock = parse parseDeclaration "Error in parsing the code block" . unpack . (<> "\n") . pTraceShowId
+  where
+  parseDeclaration :: GenParser Char st [Declaration]
+  parseDeclaration = do
+      result <- many parseStatement
+      many newline
+      eof
+      return result
 
-    textToLineEnd :: GenParser Char st String
-    textToLineEnd = many1 $ noneOf "\n"
+  textToLineEnd :: GenParser Char st String
+  textToLineEnd = many1 $ noneOf "\n"
 
-    parseStatement :: GenParser Char st Declaration
-    parseStatement = 
-      ((Import . pack <$> (string "import" >> many  whiteSpace  >> textToLineEnd))
-      <|> (Command . pack <$> (string ">" >> many  whiteSpace >> textToLineEnd))
-      <|> (ExpectedOutput . pack <$> (many whiteSpace >> textToLineEnd)))
-      <* eol
+  parseStatement :: GenParser Char st Declaration
+  parseStatement =
+    (Command <$> (char '>' >> parseCommand))
+    <|> (ExpectedOutput . pack <$> resultToString (noneOf " \n") <> textToLineEnd)
 
-    eol = char '\n'
+    where
+      resultToString = ((: []) <$>)
 
-    whiteSpace :: GenParser Char st Char
-    whiteSpace = char ' ' <|> char '\t'
+  whiteSpace :: GenParser Char st Char
+  whiteSpace = char ' ' <|> char '\t'
+
+  parseCommand :: GenParser Char st [Psci.Command]
+  parseCommand = do
+    many whiteSpace
+    commandText <- parseMultilineCommand
+    case Psci.parseCommand (pTraceShow ("parseCommand", commandText) commandText) of
+      Left err -> unexpected $ "Psci-Parser: " <> err
+      Right parsed -> return parsed
+
+  parseMultilineCommand :: GenParser Char st String
+  parseMultilineCommand = 
+       textToLineEnd 
+    <> eolString 
+    <> (mconcat <$> many (string "  " >> textToLineEnd <> eolString))
+
+  eolString = (: []) <$> eol
+
+  eol = char '\n'

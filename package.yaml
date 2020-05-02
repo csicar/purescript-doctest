@@ -91,3 +91,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - psgo
+    - hspec
