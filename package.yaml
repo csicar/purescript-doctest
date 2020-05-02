@@ -47,6 +47,7 @@ dependencies:
 - parsec
 - utf8-string
 - Glob
+- boxes
 - optparse-applicative
 
 library:
