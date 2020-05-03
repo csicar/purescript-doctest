@@ -2,7 +2,7 @@ Purepur
 =======
 
 ```bash
-stack run -- -o test-docs --src "src/**/*.purs" (spago sources)
+stack run -- -o test/docs --src "src/**/*.purs" (spago sources)
 ```
 
 Code-Generation

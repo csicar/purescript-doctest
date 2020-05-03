@@ -46,7 +46,7 @@ extractCodeFromComment comment =
     goCodeBlock _ _ = Nothing
 
 parseInfoBlock :: Text -> Either ParseError [CodeFenceCommand]
-parseInfoBlock = parse parseDeclaration "Error in parsing the code block" . unpack . (<> "\n")
+parseInfoBlock = parse parseDeclaration "Error in parsing the code block" . unpack . (<> "\n\n")
   where
     parseDeclaration :: GenParser Char st [CodeFenceCommand]
     parseDeclaration = do
@@ -54,16 +54,20 @@ parseInfoBlock = parse parseDeclaration "Error in parsing the code block" . unpa
       many newline
       eof
       return $ concat result
+    --
     textToLineEnd :: GenParser Char st String
     textToLineEnd = many1 $ noneOf "\n"
+    --
     parseStatement :: GenParser Char st [CodeFenceCommand]
     parseStatement =
-      (char '>' >> ((map Command) <$> parseCommand))
-        <|> ((: []) . ExpectedOutput . pack <$> resultToString (noneOf " \n") <> textToLineEnd <* eolString)
-      where
-        resultToString = ((: []) <$>)
+      (char '>' >> (map Command <$> parseCommand) <?> "Command Input")
+        <|> ((: []) . ExpectedOutput . pack <$> textToLineEnd <* eolString <?> "Expected Output")
+      -- where
+        -- resultToString = ((: []) <$>)
+    --
     whiteSpace :: GenParser Char st Char
     whiteSpace = char ' ' <|> char '\t'
+    --
     parseCommand :: GenParser Char st [Psci.Command]
     parseCommand = do
       many whiteSpace
@@ -71,10 +75,12 @@ parseInfoBlock = parse parseDeclaration "Error in parsing the code block" . unpa
       case Psci.parseCommand (pTraceShow ("parseCommand", commandText) commandText) of
         Left err -> unexpected $ "Psci-Parser: " <> err
         Right parsed -> return parsed
+    --
     parseMultilineCommand :: GenParser Char st String
     parseMultilineCommand =
       textToLineEnd
         <> eolString
         <> (mconcat <$> many (string "  " >> textToLineEnd <> eolString))
+    --
     eolString = (: []) <$> eol
     eol = char '\n'

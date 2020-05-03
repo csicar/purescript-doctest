@@ -11,12 +11,17 @@ import Effect.Console (log)
 --| > import Test2 (asd, class Test, (*), type (*), Maybe(..))
 --| > import Test3 hiding (ads, Maybe, Maybe(Just, Nothing))
 --| > import Asd
---| > 101 + 2 * (\x -> [x])
---|102
+--| > 101 + 2 * (\x -> x) 3
+--|107
 --| > 23
 --| 23
---| > f (Text x) | x > 0, x < 2 =
+--| > f x | x > 0, x < 2 =
 --|    x + 2
+--|   f x = 28
+--| > f 1
+--| 3
+--| > f 23
+--| 28
 --|```
 main :: Effect Unit
 main = do

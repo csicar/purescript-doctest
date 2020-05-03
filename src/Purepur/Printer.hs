@@ -22,12 +22,22 @@ import Prelude
 printPurpurDocument :: P.ModuleName -> PurepurDocument -> Text
 printPurpurDocument moduleName (PurepurDocument imports decls specs) =
   "module Test.Example." <> P.runModuleName moduleName <> " where \n\n"
+  <> T.unlines (("import " <>) <$> defImports) <> "\n\n-- Imports\n"
   <> T.unlines (printCommand <$> imports) <> "\n\n-- Declarations\n"
   <> T.unlines (printCommand <$> decls) <> "\n\n-- Specs\n"
-  <> T.unlines (printSpec <$> specs)
+  <> 
+    "main = describe " <> T.pack (show $ P.runModuleName moduleName) <> " $ do \n"<>
+    T.unlines (("    " <>) . printSpec <$> specs)
   where
     printSpec :: (Command, Text) -> Text
-    printSpec (cmd, expectedOutput) = "it \"example test\" $ show (" <> printCommand cmd <> ") `shouldBe` " <> T.pack (show expectedOutput)
+    printSpec (cmd, expectedOutput) = "it \"example test\" $ show (" <> printCommand cmd <> ") `shouldEqual` " <> T.pack (show expectedOutput)
+
+    defImports :: [Text]
+    defImports =
+      ["Prelude"
+      , "Test.Spec (describe, it)"
+      ,"Test.Spec.Assertions (shouldEqual)"
+      ]
 
 printDeclaration :: CodeFenceCommand -> Text
 printDeclaration (Command cmd) = printCommand cmd
