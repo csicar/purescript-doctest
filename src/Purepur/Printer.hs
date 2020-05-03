@@ -27,16 +27,21 @@ printPurpurDocument moduleName (PurepurDocument imports decls specs) =
   <> T.unlines (printCommand <$> decls) <> "\n\n-- Specs\n"
   <> 
     "main = describe " <> T.pack (show $ P.runModuleName moduleName) <> " $ do \n"<>
-    T.unlines (("    " <>) . printSpec <$> specs)
+    indent (T.unlines (printSpec <$> specs))
+    <> "\n    pure unit"
   where
     printSpec :: (Command, Text) -> Text
-    printSpec (cmd, expectedOutput) = "it \"example test\" $ show (" <> printCommand cmd <> ") `shouldEqual` " <> T.pack (show expectedOutput)
+    printSpec (cmd, expectedOutput) = "it \"should return the value specified\" $ show (" <> printCommand cmd <> ") `shouldEqual` " <> T.pack (show expectedOutput)
+
+    indent :: Text -> Text
+    indent = T.lines >>> fmap ("    "<>) >>> T.unlines
 
     defImports :: [Text]
     defImports =
       ["Prelude"
       , "Test.Spec (describe, it)"
       ,"Test.Spec.Assertions (shouldEqual)"
+      , "Data.Functor (void)"
       ]
 
 printDeclaration :: CodeFenceCommand -> Text
@@ -78,7 +83,7 @@ printPursDeclaration = \case
   P.DataDeclaration _ dataDeclType typeName textToSourceType dataConstructorDeclarations -> undefined
   P.DataBindingGroupDeclaration declarations -> undefined
   P.TypeSynonymDeclaration _ typeName textToSourceType sourceType -> undefined
-  P.TypeDeclaration d -> undefined
+  P.TypeDeclaration (P.TypeDeclarationData _ ident ty) -> P.runIdent ident <> " :: " <> T.stripEnd (T.pack $ P.prettyPrintType maxBound ty)
   P.ValueDeclaration (P.ValueDeclarationData _ ident nameKind binders guardedExpressions) ->
     P.runIdent ident <> " " <> T.intercalate " " (P.prettyPrintBinder <$> binders) <> foldMap printGuardedExpression guardedExpressions
   -- valDeclData :: ValueDeclarationData [GuardedExpr]

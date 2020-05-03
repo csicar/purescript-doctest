@@ -13,4 +13,6 @@ import Test.Spec.Runner (runSpec)
 
 -- Specs
 main = launchAff_ $ runSpec [consoleReporter] do 
-  Docs.main
+  -- Main.main
+  -- ArrayEx.main
+  pure unit
