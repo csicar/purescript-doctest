@@ -7,10 +7,9 @@ import Effect.Console (log)
 
 --| asd
 --| ```purescript run
---| > import Tests as T
---| > import Test2 (asd, class Test, (*), type (*), Maybe(..))
---| > import Test3 hiding (ads, Maybe, Maybe(Just, Nothing))
---| > import Asd
+--| > import Data.Array as A
+--| > import Data.Maybe (Maybe(..))
+--| > import Data.Maybe hiding (Maybe(Just, Nothing))
 --| > 101 + 2 * (\x -> x) 3
 --|107
 --| > 23
