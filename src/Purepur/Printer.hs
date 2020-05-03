@@ -5,19 +5,24 @@ import qualified Data.Text as T
 import Data.Text (Text)
 import Debug.Pretty.Simple
 import qualified Language.PureScript as P
+import Language.PureScript.Docs.Render (renderDeclaration)
+import qualified Language.PureScript.Docs.RenderedCode as RenderedCode
+import Language.PureScript.Docs.RenderedCode.Types (outputWith)
 import Language.PureScript.Interactive.Module (importDecl)
 import Language.PureScript.Interactive.Types (Command (..), ImportedModule)
 import Language.PureScript.Pretty.Values (prettyPrintValue)
 import Purepur.Parser
 import Text.PrettyPrint.Boxes (Box, render)
 import Prelude
+import Data.Function ((&))
+import Control.Arrow ((>>>))
 
 printDeclaration :: Declaration -> Text
 printDeclaration (Command cmds) = foldMap printCommand cmds
 printDeclaration (ExpectedOutput s) = "**toBe**: " <> s
 
 printCommand :: Command -> Text
-printCommand (Expression e) = T.pack $ render $ prettyPrintValue maxBound e
+printCommand (Expression e) = printExpression e
 printCommand (Import i@(moduleName, declarationType, maybeQualModName)) =
   "import " <> P.runModuleName moduleName
     <> ( case declarationType of
@@ -26,6 +31,34 @@ printCommand (Import i@(moduleName, declarationType, maybeQualModName)) =
            P.Hiding decls -> " hiding (" <> printDeclsRefs decls <> ")"
        )
     <> maybe "" (" as " <>) (P.runModuleName <$> maybeQualModName)
+printCommand (Decls decls) = T.intercalate "\n" $ printPursDeclaration <$> decls
+
+printExpression :: P.Expr -> Text
+printExpression = prettyPrintValue maxBound >>> render >>> T.pack
+
+printGuardedExpression :: P.GuardedExpr -> Text
+printGuardedExpression (P.GuardedExpr guards expr) = 
+    -- TODO: print guards
+    printExpression expr
+
+printPursDeclaration :: P.Declaration -> Text
+printPursDeclaration = pTraceShowId >>> \case
+  P.DataDeclaration _ dataDeclType typeName textToSourceType dataConstructorDeclarations -> undefined
+  P.DataBindingGroupDeclaration declarations -> undefined
+  P.TypeSynonymDeclaration _ typeName textToSourceType sourceType -> undefined
+  P.TypeDeclaration d -> undefined
+  P.ValueDeclaration (P.ValueDeclarationData _ ident nameKind binders guardedExpressions) -> 
+    P.runIdent ident <> " " <> T.intercalate " " (P.prettyPrintBinder <$> binders) <> " = " <> foldMap printGuardedExpression guardedExpressions
+    -- valDeclData :: ValueDeclarationData [GuardedExpr]
+  P.BoundValueDeclaration _ binder expr -> undefined
+  P.BindingGroupDeclaration d -> undefined
+  P.ExternDeclaration _ ident sourceType -> undefined
+  P.ExternDataDeclaration _ typeName sourceType -> undefined
+  P.FixityDeclaration _ d -> undefined
+  P.ImportDeclaration _ mod imp maybeMod -> undefined
+  P.TypeClassDeclaration _ name textToSourceType sourceConstraints funcDeps decls -> undefined
+  P.TypeInstanceDeclaration _ idents int ident2 sourceConstraints className sourceTypesypeInstanceBody j -> undefined
+  
 
 printDeclsRefs :: [P.DeclarationRef] -> Text
 printDeclsRefs decls = T.intercalate ", " (printDeclRef <$> decls)
@@ -37,7 +70,6 @@ printDeclRef (P.TypeRef _ name maybeCtors) =
       Nothing -> "(..)"
       Just [] -> ""
       Just ctors -> "(" <> T.intercalate ", " (P.runProperName <$> ctors) <> ")"
-
 printDeclRef (P.TypeOpRef _ name) = "type " <> P.showOp name
 printDeclRef (P.ValueRef _ ident) = P.showIdent ident
 printDeclRef (P.ValueOpRef _ op) = P.showOp op
