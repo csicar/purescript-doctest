@@ -14,7 +14,8 @@ import Effect.Console (log)
 --| > 101 + 2 * (\x -> [x])
 --|102
 --| > 23
---| > f x =
+--| 23
+--| > f (Text x) | x > 0, x < 2 =
 --|    x + 2
 --|```
 main :: Effect Unit
