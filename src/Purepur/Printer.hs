@@ -13,40 +13,46 @@ import qualified Language.PureScript.Docs.RenderedCode as RenderedCode
 import Language.PureScript.Docs.RenderedCode.Types (outputWith)
 import Language.PureScript.Interactive.Module (importDecl)
 import Language.PureScript.Interactive.Types (Command (..), ImportedModule)
-import Language.PureScript.Pretty.Values (prettyPrintValue)
 import Purepur.Parser
+import Purepur.PurescriptPrinter (prettyPrintValue)
 import Purepur.Types
 import Text.PrettyPrint.Boxes (Box, render)
 import Prelude
 
 printPurpurDocument :: P.ModuleName -> PurepurDocument -> Text
 printPurpurDocument moduleName (PurepurDocument imports decls specs) =
-  "module Test.Example." <> P.runModuleName moduleName <> " where \n\n"
-  <> T.unlines (("import " <>) <$> defImports) <> "\n\n-- Imports\n"
-  <> T.unlines (printCommand <$> imports) <> "\n\n-- Declarations\n"
-  <> T.unlines (printCommand <$> decls) <> "\n\n-- Specs\n"
-  <> 
-    "main = describe " <> T.pack (show $ P.runModuleName moduleName) <> " $ do \n"<>
-    indent (T.unlines (printSpec <$> specs))
-    <> "\n    pure unit"
+  "module Test.Example." <> P.runModuleName moduleName <> " where \n\n" <>
+    T.concat 
+    [ T.unlines $ ("import " <>) <$> defImports
+    , "\n\n-- Imports\n"
+    , T.unlines $ printCommand <$> imports
+    , "\n\n-- Declarations\n"
+    , T.unlines $  printCommand <$> decls
+    , "\n\n-- Specs\n"
+    , "main :: Spec Unit\n"
+    , "main = describe "
+    , T.pack $ show $ P.runModuleName moduleName
+    , " $ do \n"
+    , indent $ T.unlines (printSpec <$> specs)
+    , "\n    pure unit"
+    ]
   where
-    printSpec :: (Command, Text) -> Text
-    printSpec (cmd, expectedOutput) = "it \"should return the value specified\" $ show (" <> printCommand cmd <> ") `shouldEqual` " <> T.pack (show expectedOutput)
-
+    printSpec :: PurepurSpec -> Text
+    printSpec (ValueSpec title cmd expectedOutput) = "it \"value spec in docs from:" <> title <> "\" $ show (" <> printExpression cmd <> ") `shouldEqual` " <> T.pack (show expectedOutput)
+    printSpec (TypeSpec title cmd ty) =
+      "it \"type spec in docs from: "<> title<> "\" $ do\n"
+        <> indent
+          ( "let testType = (\n" <> indent (printExpression cmd <> ") :: (" <> ty <> ")\n")
+              <> "pure unit"
+          )
     indent :: Text -> Text
-    indent = T.lines >>> fmap ("    "<>) >>> T.unlines
-
+    indent = T.lines >>> fmap ("    " <>) >>> T.unlines
     defImports :: [Text]
     defImports =
-      ["Prelude"
-      , "Test.Spec (describe, it)"
-      ,"Test.Spec.Assertions (shouldEqual)"
-      , "Data.Functor (void)"
+      [ "Prelude (Unit, discard, pure, show, unit, ($))",
+        "Test.Spec (describe, it, Spec)",
+        "Test.Spec.Assertions (shouldEqual)"
       ]
-
-printDeclaration :: CodeFenceCommand -> Text
-printDeclaration (Command cmd) = printCommand cmd
-printDeclaration (ExpectedOutput s) = "`shouldEqual`" <> T.pack (show s)
 
 printCommand :: Command -> Text
 printCommand (Expression e) = printExpression e

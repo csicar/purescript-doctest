@@ -28,33 +28,35 @@ import Prelude
 
 generateTest :: (FilePath, D.Module) -> Except ParseError (P.ModuleName, T.Text)
 generateTest (filePath, D.Module name maybeComments declarations _) = do
-  moduleComment <- toTest maybeComments
+  moduleComment <- toTest (P.runModuleName name) maybeComments
   declarationComments <- mconcat <$> mapM generateTestForDeclaration declarations
 
   return (name, printPurpurDocument name $ moduleComment <> declarationComments)
   where
-    toTest :: Maybe T.Text -> Except ParseError PurepurDocument
-    toTest Nothing = return mempty
-    toTest (Just comment) = do
+    toTest :: T.Text -> Maybe T.Text -> Except ParseError PurepurDocument
+    toTest _ Nothing = return mempty
+    toTest title (Just comment) = do
       declarations <- Parser.extractCodeFromComment comment
 
-      return $ commandsToDocument declarations
+      return $ commandsToDocument title declarations
     --
     generateTestForDeclaration :: D.Declaration -> Except ParseError PurepurDocument
     generateTestForDeclaration (D.Declaration title maybeComment _ childDecl _) = do
-      ownComments <- toTest maybeComment
+      ownComments <- toTest title maybeComment
       childComments <- mconcat <$> mapM generateTestForChildDeclaration childDecl
       return $ ownComments <> childComments
-    generateTestForChildDeclaration (D.ChildDeclaration title maybeComment _ _) = toTest maybeComment
+    generateTestForChildDeclaration (D.ChildDeclaration title maybeComment _ _) = toTest title maybeComment
 
-commandsToDocument :: [CodeFenceCommand] -> PurepurDocument
-commandsToDocument (Command (Psci.Import i) : rest) =
-  documentFromImport i <> commandsToDocument rest
-commandsToDocument (Command (Psci.Expression expr) : ExpectedOutput str : rest) =
-  documentFromSpec expr str <> commandsToDocument rest
-commandsToDocument (Command (Psci.Decls decls) : rest) =
-  documentFromDecl decls <> commandsToDocument rest
-commandsToDocument (Command (Psci.Expression expr) : rest) = 
+commandsToDocument :: T.Text -> [CodeFenceCommand] -> PurepurDocument
+commandsToDocument title (Command (Psci.Import i) : rest) =
+  documentFromImport i <> commandsToDocument title rest
+commandsToDocument title (Command (Psci.Expression expr) : ExpectedOutput str : rest) =
+  documentFromSpec (ValueSpec title expr str) <> commandsToDocument title rest
+commandsToDocument title (Command (Psci.TypeOf expr) : ExpectedOutput str : rest) = 
+  documentFromSpec (TypeSpec title expr str) <> commandsToDocument title rest
+commandsToDocument title (Command (Psci.Decls decls) : rest) =
+  documentFromDecl decls <> commandsToDocument title rest
+commandsToDocument title (Command (Psci.Expression expr) : rest) = 
   --TODO: warn user about ignored expr
   error $ "unused expression: " <> show expr
-commandsToDocument [] = mempty
+commandsToDocument title [] = mempty

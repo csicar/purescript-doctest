@@ -1,6 +1,6 @@
-name:                psgo
+name:                purepur
 version:             0.1.0.0
-github:              "andyarvanitis/purescript-native"
+github:              "csicar/purescript-purepur"
 license:             BSD3
 author:              "Andy Arvanitis"
 maintainer:          "example@example.com"
@@ -72,7 +72,7 @@ library:
     - ViewPatterns
 
 executables:
-  psgo:
+  purepur:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -80,10 +80,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - psgo
+    - purepur
 
 tests:
-  psgo-test:
+  purepur-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -91,5 +91,5 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - psgo
+    - purepur
     - hspec
