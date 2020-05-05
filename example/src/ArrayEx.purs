@@ -1,8 +1,3 @@
---| ```purescript
---| > [1, 2, 3]
---| [1, 2, 3]
---| ```
--- |
 module ArrayEx where
 
 

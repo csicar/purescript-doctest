@@ -49,7 +49,7 @@ printPurpurDocument moduleName (PurepurDocument imports decls specs) =
     indent = T.lines >>> fmap ("    " <>) >>> T.unlines
     defImports :: [Text]
     defImports =
-      [ "Prelude (Unit, discard, pure, show, unit, ($))",
+      [ "Prelude",
         "Test.Spec (describe, it, Spec)",
         "Test.Spec.Assertions (shouldEqual)"
       ]
