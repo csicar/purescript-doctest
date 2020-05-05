@@ -43,6 +43,16 @@ Now generate the test-files:
 
 Now `test/docs` should look similar to this: https://github.com/csicar/purescript-purepur/blob/master/example/test/docs
 
+In addition to the normal PSCI-Syntax, purepur allows __multiline__ expressions and declarations:
+```
+```purescript run
+> f x = 
+    x + 1
+> f 2
+3
+```
+```
+
 Building
 --------
 
