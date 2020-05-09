@@ -15,15 +15,17 @@ import qualified Language.PureScript.Docs as D
 import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import qualified Options.Applicative as Opts
 import Purepur.Generate
+import qualified Purepur.Printer as Printer
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory, removeFile)
 import System.Exit (exitFailure)
 import System.FilePath ((</>))
-import System.FilePath.Glob (compile, glob, globDir1)
+import System.FilePath.Glob (compile, glob, globDir1, match)
 import qualified System.IO as IO
 import System.IO (hPutStrLn, stderr)
 import System.IO.UTF8 (writeUTF8FileT)
 import Text.Parsec (ParseError)
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
+import Util.IO.UTF8 (readUTF8FilesT)
 import Prelude
 
 data PurepurOptions = PurepurOptions
@@ -54,10 +56,23 @@ docgen p@(PurepurOptions moutput compileOutput inputGlob compileInputGlob) = do
   fileMs <- parseAndConvert compileInput
 
   let ext = compile "*.purs"
-  msCommentTest <- runExceptIO $ mapM generateTest $ filter ((`elem` input) . fst) fileMs
+  msCommentTest <-
+    runExceptIO
+      $ mapM generateTest
+      $ filter ((`elem` input) . fst) fileMs
+
+  markdownInputs <- readUTF8FilesT $ filter ("**/*.md" `match`) input
+
+  testsFromMarkdown <-
+    runExceptIO $
+      mapM
+        generateTestFromMarkdownFile
+        markdownInputs
+
   createDirectoryIfMissing True output
   globDir1 ext output >>= mapM_ removeFile
   writeTestModules output msCommentTest
+  writeTestModules output $ (\(doc, name) -> (name, Printer.printPurpurDocument name doc)) <$> testsFromMarkdown
 
   pure ()
   where
@@ -78,12 +93,6 @@ docgen p@(PurepurOptions moutput compileOutput inputGlob compileInputGlob) = do
     parseAndConvert input =
       runExceptT (fmap fst (D.collectDocs compileOutput input []))
         >>= successOrExit
-    writeTagsToFile :: String -> [String] -> IO ()
-    writeTagsToFile outputFilename tags = do
-      currentDir <- getCurrentDirectory
-      let outputFile = currentDir </> outputFilename
-      let text = T.pack . unlines $ tags
-      writeUTF8FileT outputFile text
 
 writeTestModules :: FilePath -> [(P.ModuleName, T.Text)] -> IO ()
 writeTestModules outputDir = mapM_ (writeTestModule outputDir)

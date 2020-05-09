@@ -72,7 +72,7 @@ parseInfoBlock = parse parseDeclaration "Error in parsing the code block" . unpa
     parseCommand = do
       many whiteSpace
       commandText <- parseMultilineCommand
-      case Psci.parseCommand (pTraceShow ("parseCommand", commandText) commandText) of
+      case Psci.parseCommand commandText of
         Left err -> unexpected $ "Psci-Parser: " <> err
         Right parsed -> return parsed
     --
