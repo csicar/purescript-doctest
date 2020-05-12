@@ -36,7 +36,7 @@ The syntax of the code-fence is identical to that of PSCI. This means that copyi
 
 Now generate the test-files:
 
-`purepure -o test/docs --src "src/**/*.purs" (spago sources)`
+`purepure -o test/docs --src "src/**/*.purs" --src "./README.md" $(spago sources)`
 
 - `-o` specifies the directory, where the test-files should be written to
 - `--src` specified the glob, for which tests should be generated.
