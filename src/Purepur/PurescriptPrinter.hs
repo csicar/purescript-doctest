@@ -11,7 +11,7 @@ module Purepur.PurescriptPrinter
 
 import Prelude.Compat hiding ((<>))
 
-import Control.Arrow (second)
+import Control.Arrow (second, (>>>))
 
 import Data.Maybe (maybe)
 import Data.Text (Text)
@@ -104,16 +104,21 @@ prettyPrintValue d expr@BinaryNoParens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Parens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
 
+prettyPrintQualifiedName :: (a -> Box) -> Qualified a -> Box
+prettyPrintQualifiedName f (Qualified Nothing ident) = f ident
+prettyPrintQualifiedName f (Qualified (Just mod) ident) = text (T.unpack $ runModuleName mod) <> text "." <> f ident
+
+
 -- | Pretty-print an atomic expression, adding parentheses if necessary.
 prettyPrintValueAtom :: Int -> Expr -> Box
 prettyPrintValueAtom d (Literal _ l) = prettyPrintLiteralValue d l
 prettyPrintValueAtom _ AnonymousArgument = text "_"
-prettyPrintValueAtom _ (Constructor _ name) = text $ T.unpack $ runProperName (disqualify name)
-prettyPrintValueAtom _ (Var _ ident) = text $ T.unpack $ showIdent (disqualify ident)
+prettyPrintValueAtom _ (Constructor _ name) = prettyPrintQualifiedName (runProperName >>> T.unpack >>> text) name
+prettyPrintValueAtom _ (Var _ ident) = prettyPrintQualifiedName (showIdent >>> T.unpack >>> text) ident
 prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
   prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
   where
-  printOp (Op _ (Qualified _ name)) = text $ T.unpack $ runOpName name
+  printOp (Op _ name) = prettyPrintQualifiedName (runOpName >>> T.unpack >>> text) name
   printOp expr = text "`" <> prettyPrintValue (d - 1) expr `before` text "`"
 prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val
