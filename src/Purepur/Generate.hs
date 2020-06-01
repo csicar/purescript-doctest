@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Purepur.Generate where
 
 import Control.Applicative
@@ -27,7 +28,8 @@ import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import Prelude
 
 generateTest :: (FilePath, D.Module) -> Except ParseError (P.ModuleName, T.Text)
-generateTest (filePath, D.Module name maybeComments declarations _) = do
+generateTest (filePath, D.Module (P.ModuleName sourceModName) maybeComments declarations _) = do
+  let name = P.ModuleName $ P.ProperName "Test" : P.ProperName "DocTest" : sourceModName
   moduleComment <- generateTestFromMarkdown (P.runModuleName name) maybeComments
   declarationComments <- mconcat <$> mapM generateTestForDeclaration declarations
 
@@ -70,10 +72,24 @@ generateTestFromMarkdownFile (path, textContent) = do
     moduleNameFromPath :: FilePath -> P.ModuleName
     moduleNameFromPath filePath =
       P.ModuleName $
-        P.ProperName "Test" : P.ProperName "MarkdownExamples"
-          : ( map P.ProperName
-                $ filter (/= "")
-                $ T.splitOn "/"
-                $ T.replace "." ""
-                $ T.pack (pTraceShowId filePath)
+        P.ProperName "Test"
+        : P.ProperName "MarkdownExamples"
+        : fmap P.ProperName 
+            ( filter (/= "")
+            $ T.splitOn "/"
+            $ T.replace "." ""
+            $ T.pack (pTraceShowId filePath)
             )
+
+-- generates a File, that imports all others tests and runs them.
+generateSummaryFile :: [P.ModuleName] -> (PurepurDocument, P.ModuleName)
+generateSummaryFile testModules = (doc, P.ModuleName [P.ProperName "DocTest"])
+  where
+    doc :: PurepurDocument
+    doc = mconcat $ documentFromModuleName <$> testModules
+
+    documentFromModuleName :: P.ModuleName -> PurepurDocument
+    documentFromModuleName mod =
+      documentFromImport (mod, P.Implicit, Just mod)
+      <>
+      documentFromSpec (ReferenceSpec $ P.mkQualified (P.Ident "main") mod)

@@ -10,6 +10,7 @@ import Control.Monad.Writer
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Debug.Pretty.Simple
+import Text.Pretty.Simple
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
@@ -73,7 +74,9 @@ docgen p@(PurepurOptions moutput compileOutput inputGlob compileInputGlob) = do
   globDir1 ext output >>= mapM_ removeFile
   writeTestModules output msCommentTest
   writeTestModules output $ (\(doc, name) -> (name, Printer.printPurpurDocument name doc)) <$> testsFromMarkdown
-
+  let (summaryDoc, summaryModName) = generateSummaryFile ((fst <$> msCommentTest) ++ (snd <$> testsFromMarkdown))
+  -- pPrint summaryFile
+  writeTestModule output (summaryModName, Printer.printPurpurDocument summaryModName summaryDoc) 
   pure ()
   where
     runExceptIO :: Except ParseError a -> IO a
@@ -114,8 +117,8 @@ main = do
     opts =
       Opts.info
         command
-        ( Opts.progDesc "Print a greeting for TARGET"
-            <> Opts.header "hello - a test for optparse-applicative"
+        ( Opts.progDesc "Generate tests from code-examples in purescript docs"
+            <> Opts.header "purescript-doctest"
         )
 
 pscDocsOptions :: Opts.Parser PurepurOptions

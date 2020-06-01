@@ -1,4 +1,4 @@
-module Test.Example.Sub.Sub1 where 
+module Test.DocTest.Sub.Sub1 where 
 
 import Prelude
 import Test.Spec (describe, it, Spec)
@@ -13,6 +13,6 @@ import Test.Spec.Assertions (shouldEqual)
 
 -- Specs
 main :: Spec Unit
-main = describe "Sub.Sub1" $ do 
+main = describe "Test.DocTest.Sub.Sub1" $ do 
 
     pure unit

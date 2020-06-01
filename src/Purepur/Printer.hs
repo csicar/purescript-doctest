@@ -21,13 +21,13 @@ import Prelude
 
 printPurpurDocument :: P.ModuleName -> PurepurDocument -> Text
 printPurpurDocument moduleName (PurepurDocument imports decls specs) =
-  "module Test.Example." <> P.runModuleName moduleName <> " where \n\n" <>
+  "module " <> P.runModuleName moduleName <> " where \n\n" <>
     T.concat 
     [ T.unlines $ ("import " <>) <$> defImports
     , "\n\n-- Imports\n"
-    , T.unlines $ printCommand <$> imports
+    , T.unlines $ printImport <$> imports
     , "\n\n-- Declarations\n"
-    , T.unlines $  printCommand <$> decls
+    , T.unlines $  printPursDeclaration <$> decls
     , "\n\n-- Specs\n"
     , "main :: Spec Unit\n"
     , "main = describe "
@@ -38,7 +38,8 @@ printPurpurDocument moduleName (PurepurDocument imports decls specs) =
     ]
   where
     printSpec :: PurepurSpec -> Text
-    printSpec (ValueSpec title cmd expectedOutput) = "it \"value spec in docs from:" <> title <> "\" $ show (" <> printExpression cmd <> ") `shouldEqual` " <> T.pack (show expectedOutput)
+    printSpec (ValueSpec title cmd expectedOutput) = "it \"value spec in docs from: " <> title <> "\" $ show (" <> printExpression cmd <> ") `shouldEqual` " <> T.pack (show expectedOutput)
+    printSpec (ReferenceSpec ref) = printExpression (P.Var P.nullSourceSpan ref)
     printSpec (TypeSpec title cmd ty) =
       "it \"type spec in docs from: "<> title<> "\" $ do\n"
         <> indent
@@ -54,9 +55,7 @@ printPurpurDocument moduleName (PurepurDocument imports decls specs) =
         "Test.Spec.Assertions (shouldEqual)"
       ]
 
-printCommand :: Command -> Text
-printCommand (Expression e) = printExpression e
-printCommand (Import i@(moduleName, declarationType, maybeQualModName)) =
+printImport i@(moduleName, declarationType, maybeQualModName) =
   "import " <> P.runModuleName moduleName
     <> ( case declarationType of
            P.Implicit -> ""
@@ -64,7 +63,6 @@ printCommand (Import i@(moduleName, declarationType, maybeQualModName)) =
            P.Hiding decls -> " hiding (" <> printDeclsRefs decls <> ")"
        )
     <> maybe "" (" as " <>) (P.runModuleName <$> maybeQualModName)
-printCommand (Decls decls) = T.intercalate "\n" $ printPursDeclaration <$> decls
 
 printExpression :: P.Expr -> Text
 printExpression = prettyPrintValue maxBound >>> render >>> T.pack >>> T.stripEnd

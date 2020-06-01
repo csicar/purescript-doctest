@@ -14,8 +14,8 @@ instance Eq CodeFenceCommand where
   a == b = show a == show b -- TODO : Eq instance for Psci.Command missing. Fix this in Purescript lang
 
 data PurepurDocument = PurepurDocument
-  { imports :: [Psci.Command],
-    declarations :: [Psci.Command],
+  { imports :: [Psci.ImportedModule],
+    declarations :: [P.Declaration],
     specs :: [PurepurSpec]
   }
   deriving (Show)
@@ -29,13 +29,14 @@ instance Monoid PurepurDocument where
 data PurepurSpec
   = ValueSpec Text P.Expr Text
   | TypeSpec Text P.Expr Text
+  | ReferenceSpec (P.Qualified P.Ident)
   deriving (Show)
 
 documentFromImport :: Psci.ImportedModule -> PurepurDocument
-documentFromImport i = PurepurDocument [Psci.Import i] [] []
+documentFromImport i = PurepurDocument [i] [] []
 
 documentFromDecl :: [P.Declaration] -> PurepurDocument
-documentFromDecl i = PurepurDocument [] [Psci.Decls i] []
+documentFromDecl i = PurepurDocument [] i []
 
 documentFromSpec :: PurepurSpec -> PurepurDocument
 documentFromSpec spec = PurepurDocument [] [] [spec]
