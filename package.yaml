@@ -2,13 +2,11 @@ name:                purepur
 version:             0.1.0.0
 github:              "csicar/purescript-purepur"
 license:             BSD3
-author:              "Andy Arvanitis"
+author:              "csicar"
 maintainer:          "example@example.com"
-copyright:           "2018 Andy Arvanitis"
 
 extra-source-files:
 - README.md
-- ChangeLog.md
 - stack.yaml
 - support/*
 
