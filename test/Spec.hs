@@ -12,7 +12,7 @@ import qualified Language.PureScript.Interactive.Types as Psci
 main :: IO ()
 main = hspec $
   describe "Parse Comment" $ do
-    let importT = Command $ Psci.Import (Purs.ModuleName [Purs.ProperName "T"], AST.Implicit, Nothing)
+    let importT = Command $ Psci.Import (Purs.moduleNameFromString "T", AST.Implicit, Nothing)
 
     it "simple output" $ 
       parseInfoBlock "asd" `shouldBe` Right [ExpectedOutput "asd"]

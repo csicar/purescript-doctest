@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Purepur.Generate where
 
 import Control.Applicative
@@ -29,7 +30,7 @@ import Prelude
 
 generateTest :: (FilePath, D.Module) -> Except ParseError (P.ModuleName, T.Text)
 generateTest (filePath, D.Module (P.ModuleName sourceModName) maybeComments declarations _) = do
-  let name = P.ModuleName $ P.ProperName "Test" : P.ProperName "DocTest" : sourceModName
+  let name = P.moduleNameFromString $ "Test.DocTest." <> sourceModName
   moduleComment <- generateTestFromMarkdown (P.runModuleName name) maybeComments
   declarationComments <- mconcat <$> mapM generateTestForDeclaration declarations
 
@@ -71,25 +72,23 @@ generateTestFromMarkdownFile (path, textContent) = do
   where
     moduleNameFromPath :: FilePath -> P.ModuleName
     moduleNameFromPath filePath =
-      P.ModuleName $
-        P.ProperName "Test"
-        : P.ProperName "MarkdownExamples"
-        : fmap P.ProperName 
+      P.moduleNameFromString $
+        "Test.MarkdownExamples."
+          <> T.intercalate
+            "."
             ( filter (/= "")
-            $ T.splitOn "/"
-            $ T.replace "." ""
-            $ T.pack (pTraceShowId filePath)
+                $ T.splitOn "/"
+                $ T.replace "." ""
+                $ T.pack (pTraceShowId filePath)
             )
 
 -- generates a File, that imports all others tests and runs them.
 generateSummaryFile :: [P.ModuleName] -> (PurepurDocument, P.ModuleName)
-generateSummaryFile testModules = (doc, P.ModuleName [P.ProperName "DocTest"])
+generateSummaryFile testModules = (doc, P.moduleNameFromString "DocTest")
   where
     doc :: PurepurDocument
     doc = mconcat $ documentFromModuleName <$> testModules
-
     documentFromModuleName :: P.ModuleName -> PurepurDocument
     documentFromModuleName mod =
       documentFromImport (mod, P.Implicit, Just mod)
-      <>
-      documentFromSpec (ReferenceSpec $ P.mkQualified (P.Ident "main") mod)
+        <> documentFromSpec (ReferenceSpec $ P.mkQualified (P.Ident "main") mod)
