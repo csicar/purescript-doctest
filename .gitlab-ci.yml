@@ -1,4 +1,4 @@
-image: haskell
+image: haskell:8.6.5
 
 build:
   script:
