@@ -1,8 +1,17 @@
 image: haskell:8.6.5 
 
+cache:
+  key: purty-v1
+  paths:
+    - .stack-root
+    - .stack-work
+
+variables:
+  LC_ALL: C.UTF-8
+  STACK_ROOT: $CI_PROJECT_DIR/.stack-root
+
 build:
   script:
-    - LC_ALL=en_US.UTF-8
     - stack build --copy-bins --flag purepur:static 
   artifacts:
     paths:
