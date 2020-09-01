@@ -1,0 +1,12 @@
+image: haskell
+
+build:
+  script:
+    - stack build --copy-bins --flag purepur:static 
+  artifacts:
+    paths:
+      - /root/.local/bin/purepur
+
+test:
+  script:
+    - stack build --test --no-run-tests --flag purepur:static --haddock --no-haddock-deps
