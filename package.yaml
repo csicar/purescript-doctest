@@ -2,7 +2,7 @@ name:                purepur
 version:             0.1.0.0
 github:              "csicar/purescript-purepur"
 license:             BSD3
-author:              "cssicar"
+author:              "csicar"
 maintainer:          "example@example.com"
 
 extra-source-files:
@@ -27,7 +27,7 @@ description:         Please see the README on Github at <https://github.com/andy
 dependencies:
 - base >= 4.7 && < 5
 - bytestring >= 0.10.8.2 && < 0.11
-- purescript -any
+- purescript == 0.13.8
 - base-compat >=0.6.0
 - protolude >=0.1.6
 - text
