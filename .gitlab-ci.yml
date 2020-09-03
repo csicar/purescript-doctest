@@ -12,10 +12,10 @@ variables:
 
 build:
   script:
-    - stack build --copy-bins --flag purepur:static 
+    - stack build --copy-bins --local-bin-path ./artifacts --flag purepur:static 
   artifacts:
     paths:
-      - /root/.local/bin/purepur
+      - ./artifacts
 
 test:
   script:
