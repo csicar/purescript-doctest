@@ -28,7 +28,17 @@ build-macos:
   tags: [macOS]
   needs: []
   script:
-    - stack build --copy-bins --local-bin-path ./artifacts --flag purepur:static
+    - stack build --copy-bins --local-bin-path ./artifacts
+  artifacts:
+    paths:
+      - ./artifacts
+
+build-win:
+  stage: build
+  tags: [windows]
+  needs: []
+  script:
+    - stack build --copy-bins --local-bin-path ./artifacts
   artifacts:
     paths:
       - ./artifacts
