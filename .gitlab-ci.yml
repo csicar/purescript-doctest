@@ -1,5 +1,9 @@
 image: haskell:8.6.5 
 
+stages:
+  - build
+  - test
+
 cache:
   key: purty-v1
   paths:
@@ -10,13 +14,29 @@ variables:
   LC_ALL: C.UTF-8
   STACK_ROOT: $CI_PROJECT_DIR/.stack-root
 
-build:
+build-linux:
+  stage: build
+  needs: []
   script:
     - stack build --copy-bins --local-bin-path ./artifacts --flag purepur:static 
   artifacts:
     paths:
       - ./artifacts
 
+build-macos:
+  stage: build
+  tags: [macOS]
+  needs: []
+  script:
+    - stack build --copy-bins --local-bin-path ./artifacts --flag purepur:static
+  artifacts:
+    paths:
+      - ./artifacts
+
+
+
 test:
+  stage: test
+  needs: []
   script:
     - stack build --test --no-run-tests --flag purepur:static --haddock --no-haddock-deps
