@@ -3,6 +3,7 @@ image: haskell:8.6.5
 stages:
   - build
   - test
+  - deploy
 
 cache:
   key: purty-v1
@@ -28,21 +29,20 @@ build-macos:
   tags: [macOS]
   needs: []
   script:
-    - stack build --copy-bins --local-bin-path ./artifacts
+    - stack build --copy-bins --local-bin-path ./artifacts-macos
   artifacts:
     paths:
-      - ./artifacts
+      - ./artifacts-macos
 
 build-win:
   stage: build
   tags: [windows]
   needs: []
   script:
-    - stack build --copy-bins --local-bin-path ./artifacts
+    - C:\Users\csicar\AppData\Roaming\local\bin\stack.exe build --copy-bins --local-bin-path ./artifacts-win
   artifacts:
     paths:
-      - ./artifacts
-
+      - ./artifacts-win
 
 
 test:
