@@ -1,0 +1,29 @@
+{
+  "name": "purescript-doctest",
+  "version": "0.1.5",
+  "description": "Doctest for Purescript",
+  "scripts": {
+    "postinstall": "node ./install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/csicar/purescript-doctest.git"
+  },
+  "keywords": [
+    "purescript",
+    "doctest"
+  ],
+  "bin": {
+    "purepur": "./purepur"
+  },
+  "author": "csicar",
+  "license": " BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/csicar/purescript-doctest/issues"
+  },
+  "homepage": "https://github.com/csicar/purescript-doctest#readme",
+  "dependencies": {
+    "request": "^2.88.0",
+    "tar": "^4.4.8"
+  }
+}
