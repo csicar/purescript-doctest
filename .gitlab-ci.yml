@@ -6,7 +6,7 @@ stages:
   - deploy
 
 cache:
-  key: purty-v1
+  key: purepur-v1
   paths:
     - .stack-root
     - .stack-work
