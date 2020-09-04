@@ -33,6 +33,7 @@ build-macos:
   artifacts:
     paths:
       - ./artifacts-macos
+  allow_failure: true
 
 build-win:
   stage: build
@@ -43,6 +44,7 @@ build-win:
   artifacts:
     paths:
       - ./artifacts-win
+  allow_failure: true
 
 
 test:
