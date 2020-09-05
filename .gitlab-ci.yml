@@ -1,7 +1,12 @@
 image: haskell:8.6.5 
 
+stages:
+  - build
+  - test
+  - deploy
+
 cache:
-  key: purty-v1
+  key: purepur-v1
   paths:
     - .stack-root
     - .stack-work
@@ -10,13 +15,40 @@ variables:
   LC_ALL: C.UTF-8
   STACK_ROOT: $CI_PROJECT_DIR/.stack-root
 
-build:
+build-linux:
+  stage: build
+  needs: []
   script:
     - stack build --copy-bins --local-bin-path ./artifacts --flag purepur:static 
   artifacts:
     paths:
       - ./artifacts
 
+build-macos:
+  stage: build
+  tags: [macOS]
+  needs: []
+  script:
+    - stack build --copy-bins --local-bin-path ./artifacts-macos
+  artifacts:
+    paths:
+      - ./artifacts-macos
+  allow_failure: true
+
+build-win:
+  stage: build
+  tags: [windows]
+  needs: []
+  script:
+    - C:\Users\csicar\AppData\Roaming\local\bin\stack.exe build --copy-bins --local-bin-path ./artifacts-win
+  artifacts:
+    paths:
+      - ./artifacts-win
+  allow_failure: true
+
+
 test:
+  stage: test
+  needs: []
   script:
     - stack build --test --no-run-tests --flag purepur:static --haddock --no-haddock-deps
