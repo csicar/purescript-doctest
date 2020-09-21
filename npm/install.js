@@ -9,4 +9,4 @@ const version = "v0.1.1";
 const platform = { win32: "windows", darwin: "osx" }[process.platform] || "linux";
 const url = `https://github.com/csicar/purescript-doctest/releases/download/${version}/${platform}.tar.gz`
 console.log(url)
-request.get(url).pipe(tar.x({C: './'}));
+request.get(url).pipe(tar.x({ C: './' }));
