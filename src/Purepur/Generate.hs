@@ -64,6 +64,9 @@ generateTestFromMarkdown title (Just comment) = do
       --TODO: warn user about ignored expr
       error $ "unused expression: " <> show expr
     commandsToDocument title [] = mempty
+    commandsToDocument title (ExpectedOutput str: rest) = 
+      error $ "Could not translate doctest comment: Found expected output " <> show str <> ", but no matching command."
+        <> " Maybe you missed a `>`? "
 
 generateTestFromMarkdownFile :: (FilePath, T.Text) -> Except ParseError (PurepurDocument, P.ModuleName)
 generateTestFromMarkdownFile (path, textContent) = do
