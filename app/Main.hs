@@ -41,7 +41,7 @@ data PurepurOptions = PurepurOptions
 
 docgen :: PurepurOptions -> IO ()
 docgen p@(PurepurOptions moutput compileOutput inputGlob compileInputGlob) = do
-  compileInput <- concat <$> mapM glob compileInputGlob
+  compileInput <- concat <$> mapM glob (concatMap lines compileInputGlob)
   input <- concat <$> mapM glob inputGlob
 
   when (null compileInput) $ do
