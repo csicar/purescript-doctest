@@ -43,10 +43,13 @@ packages:
 extra-deps:
 - happy-1.19.9
 - language-javascript-0.7.0.0
-- purescript-0.13.8
+- purescript-0.14.0
 - network-3.0.1.1
 - these-1.0.1
 - semialign-1
+- purescript-ast-0.1.0.0
+- purescript-cst-0.1.0.0
+
 # Override default flag values for local packages and extra-deps
 # flags: {}
 flags:
