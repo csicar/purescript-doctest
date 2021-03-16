@@ -1,6 +1,6 @@
 {
   "name": "purescript-doctest",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Doctest for Purescript",
   "scripts": {
     "postinstall": "node ./install.js"
