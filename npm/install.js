@@ -5,7 +5,7 @@
 
 const request = require("request");
 const tar = require("tar");
-const version = "v0.1.1";
+const version = "v0.1.2";
 const platform = { win32: "windows", darwin: "osx" }[process.platform] || "linux";
 const url = `https://github.com/csicar/purescript-doctest/releases/download/${version}/${platform}.tar.gz`
 console.log(url)
