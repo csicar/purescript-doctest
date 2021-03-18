@@ -28,8 +28,8 @@ main = hspec $ do
       parseInfoBlock "> import\n   T\n123" `shouldBe` Right [importT, ExpectedOutput "123"]
 
   describe "Pretty Print" $ do
-    it "print qualified op" $ do
-      let Right [doBlock, expectedOutput] = parseInfoBlock "> do\n    a\n    b\nunit"
+    it "print do block" $ do
+      let Right [doBlock, expectedOutput] = parseInfoBlock "> do\n    a\n    b\n    c\nunit"
       case doBlock of
         Command (Psci.Expression e) -> 
-          Printer.printExpression e `shouldBe` "do\n   a\n   b"
+          Printer.printExpression e `shouldBe` "do  \n   a\n   b\n   c"
