@@ -1,17 +1,20 @@
 -- |
 -- Pretty printer for values
+-- Copied from https://github.com/purescript/purescript/blob/master/src/Language/PureScript/Pretty/Values.hs
+--  
+-- In theory, this module can be replaced by purescript's own pretty printer
+-- Changes to the building:
+--     - fix do notation pretty printing
 --
--- from module Language.PureScript.Pretty.Values
-module Purepur.PurescriptPrinter
+module Purepur.PurescriptPrettyPrinter
   ( prettyPrintValue
   , prettyPrintBinder
   , prettyPrintBinderAtom
-  , prettyPrintDeclaration
   ) where
 
 import Prelude.Compat hiding ((<>))
 
-import Control.Arrow (second, (>>>))
+import Control.Arrow (second)
 
 import Data.Maybe (maybe)
 import Data.Text (Text)
@@ -69,6 +72,7 @@ prettyPrintValue d (ObjectUpdateNested o ps) = prettyPrintValueAtom (d - 1) o `b
     printNode (key, Leaf val) = prettyPrintUpdateEntry d key val
     printNode (key, Branch val) = textT (prettyPrintObjectKey key) `beforeWithSpace` prettyPrintUpdate val
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
+prettyPrintValue d (Unused val) = prettyPrintValue d val
 prettyPrintValue d (Abs arg val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (TypeClassDictionaryConstructorApp className ps) =
   text (T.unpack (runProperName (disqualify className)) ++ " ") <> prettyPrintValueAtom (d - 1) ps
@@ -84,15 +88,19 @@ prettyPrintValue d (Let FromLet ds val) =
     moveRight 2 (vcat left (map (prettyPrintDeclaration (d - 1)) ds)) //
     (text "in " <> prettyPrintValue (d - 1) val)
 prettyPrintValue d (Do m els) =
-  textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
+  vcat left 
+    [textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "do"
+    , vcat left $ map  ("   "<>) $ map (prettyPrintDoNotationElement (d - 1)) els
+    ]
 prettyPrintValue d (Ado m els yield) =
-  textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
+  textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "ado\n" <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
   (text "in " <> prettyPrintValue (d - 1) yield)
+-- TODO: constraint kind args
 prettyPrintValue d (TypeClassDictionary (Constraint _ name _ tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ T.unpack (runProperName (disqualify name))) : map (typeAtomAsBox d) tys
 prettyPrintValue _ (DeferredDictionary name _) = text $ "#dict " ++ T.unpack (runProperName (disqualify name))
 prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
     text "#dict-accessor " <> text (T.unpack (runProperName (disqualify className))) <> text "." <> text (T.unpack (showIdent ident)) <> text ">"
-prettyPrintValue d (TypedValue _ val ty) = prettyPrintValue d val <> " :: " <> typeAsBox d ty
+prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
 prettyPrintValue d (Literal _ l) = prettyPrintLiteralValue d l
 prettyPrintValue _ (Hole name) = text "?" <> textT name
@@ -104,21 +112,16 @@ prettyPrintValue d expr@BinaryNoParens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Parens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
 
-prettyPrintQualifiedName :: (a -> Box) -> Qualified a -> Box
-prettyPrintQualifiedName f (Qualified Nothing ident) = f ident
-prettyPrintQualifiedName f (Qualified (Just mod) ident) = text (T.unpack $ runModuleName mod) <> text "." <> f ident
-
-
 -- | Pretty-print an atomic expression, adding parentheses if necessary.
 prettyPrintValueAtom :: Int -> Expr -> Box
 prettyPrintValueAtom d (Literal _ l) = prettyPrintLiteralValue d l
 prettyPrintValueAtom _ AnonymousArgument = text "_"
-prettyPrintValueAtom _ (Constructor _ name) = prettyPrintQualifiedName (runProperName >>> T.unpack >>> text) name
-prettyPrintValueAtom _ (Var _ ident) = prettyPrintQualifiedName (showIdent >>> T.unpack >>> text) ident
+prettyPrintValueAtom _ (Constructor _ name) = text $ T.unpack $ runProperName (disqualify name)
+prettyPrintValueAtom _ (Var _ ident) = text $ T.unpack $ showIdent (disqualify ident)
 prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
   prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
   where
-  printOp (Op _ name) = prettyPrintQualifiedName (runOpName >>> T.unpack >>> text) name
+  printOp (Op _ (Qualified _ name)) = text $ T.unpack $ runOpName name
   printOp expr = text "`" <> prettyPrintValue (d - 1) expr `before` text "`"
 prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val

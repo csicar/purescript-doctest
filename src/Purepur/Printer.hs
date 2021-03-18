@@ -14,7 +14,7 @@ import Language.PureScript.Docs.RenderedCode.Types (outputWith)
 import Language.PureScript.Interactive.Module (importDecl)
 import Language.PureScript.Interactive.Types (Command (..), ImportedModule)
 import Purepur.Parser
-import Purepur.PurescriptPrinter (prettyPrintValue)
+import Purepur.PurescriptPrettyPrinter (prettyPrintValue)
 import Purepur.Types
 import Text.PrettyPrint.Boxes (Box, render)
 import Prelude
