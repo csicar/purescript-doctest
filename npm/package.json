@@ -24,6 +24,6 @@
   "homepage": "https://github.com/csicar/purescript-doctest#readme",
   "dependencies": {
     "request": "^2.88.0",
-    "tar": "^4.4.8"
+    "tar": "^6.1.9"
   }
 }
